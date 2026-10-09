@@ -1,0 +1,5 @@
+[
+  { "usuario": "admin", "password": "admin123", "rol": "ADMINISTRADOR", "nombre": "Admin General" },
+  { "usuario": "cliente1", "password": "cliente123", "rol": "CLIENTE", "nombre": "Juan Cliente" },
+  { "usuario": "refugio1", "password": "refugio123", "rol": "REFUGIO", "nombre": "Refugio Patitas Felices" }
+]

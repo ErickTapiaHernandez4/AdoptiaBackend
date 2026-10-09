@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "nombre": "Firulais",
+        "tipo": "Perro",
+        "edad": "2 años",
+        "refugio": "Refugio Patitas Felices"
+    },
+    {
+        "id": 2,
+        "nombre": "Luna",
+        "tipo": "Gata",
+        "edad": "1 año",
+        "refugio": "Refugio Patitas Felices"
+    },
+    {
+        "id": 3,
+        "nombre": "Max",
+        "tipo": "Perro",
+        "edad": "4 años",
+        "refugio": "Refugio Patitas Felices"
+    },
+    {
+        "id": 4,
+        "nombre": "Nala",
+        "tipo": "Perra",
+        "edad": "6 meses",
+        "refugio": "Refugio Patitas Felices"
+    }
+]

@@ -1,0 +1,9 @@
+[
+    {
+        "id": 1,
+        "mascotaId": 1,
+        "mascota": "Firulais",
+        "cliente": "Juan Cliente",
+        "estado": "APROBADA"
+    }
+]
