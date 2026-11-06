@@ -23,4 +23,7 @@ dependencies {
     implementation("io.ktor:ktor-server-call-logging:2.3.11")
     implementation("io.ktor:ktor-server-cors:2.3.11")
     implementation("ch.qos.logback:logback-classic:1.5.6")
+
+    // Driver para conectarse a la base de datos MySQL en Railway
+    implementation("com.mysql:mysql-connector-j:8.4.0")
 }

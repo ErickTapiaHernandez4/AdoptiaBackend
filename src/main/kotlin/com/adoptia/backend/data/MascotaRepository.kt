@@ -2,92 +2,129 @@ package com.adoptia.backend.data
 
 import com.adoptia.backend.data.model.Mascota
 import com.adoptia.backend.data.model.Solicitud
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
-import java.io.File
 
-// Guarda las mascotas y las solicitudes en archivos JSON dentro de la carpeta
-// "datos" del proyecto del backend. No necesita base de datos.
-// - Leer:    texto JSON  -> List<Mascota>   (decodeFromString = deserializar)
-// - Guardar: List<Mascota> -> texto JSON    (encodeToString  = serializar)
+// Guarda mascotas y solicitudes en la base de datos MySQL de Railway.
 class MascotaRepository {
 
-    private val json = Json {
-        prettyPrint = true      // el archivo queda ordenado y fácil de leer
-        encodeDefaults = true   // también guarda los valores por defecto (ej. estado)
-    }
-
-    private val carpeta = File("datos")
-    private val archivoMascotas = File(carpeta, "mascotas.json")
-    private val archivoSolicitudes = File(carpeta, "solicitudes.json")
-
-    // La primera vez que corre el servidor se crean los archivos.
+    // Al arrancar el servidor: crea las tablas si no existen y mete mascotas de ejemplo.
     init {
-        carpeta.mkdirs()
-        if (!archivoMascotas.exists()) {
-            guardarMascotas(mascotasIniciales())
-        }
-        if (!archivoSolicitudes.exists()) {
-            guardarSolicitudes(emptyList())
+        Database.conexion().use { c ->
+            c.createStatement().use { st ->
+                st.executeUpdate(
+                    """
+                    CREATE TABLE IF NOT EXISTS mascotas (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        nombre VARCHAR(100) NOT NULL,
+                        tipo VARCHAR(50) NOT NULL,
+                        edad VARCHAR(50) NOT NULL,
+                        refugio VARCHAR(150) NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                st.executeUpdate(
+                    """
+                    CREATE TABLE IF NOT EXISTS solicitudes (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        mascota_id INT NOT NULL,
+                        cliente VARCHAR(150) NOT NULL,
+                        estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+                        FOREIGN KEY (mascota_id) REFERENCES mascotas(id)
+                    )
+                    """.trimIndent()
+                )
+                val total = st.executeQuery("SELECT COUNT(*) FROM mascotas").use { rs ->
+                    rs.next()
+                    rs.getInt(1)
+                }
+                if (total == 0) {
+                    st.executeUpdate(
+                        """
+                        INSERT INTO mascotas (nombre, tipo, edad, refugio) VALUES
+                        ('Firulais', 'Perro', '2 años', 'Refugio Patitas Felices'),
+                        ('Luna', 'Gata', '1 año', 'Refugio Patitas Felices'),
+                        ('Max', 'Perro', '4 años', 'Refugio Patitas Felices'),
+                        ('Nala', 'Perra', '6 meses', 'Refugio Patitas Felices')
+                        """.trimIndent()
+                    )
+                }
+            }
         }
     }
 
-    // ---------- Mascotas ----------
-
-    @Synchronized
     fun listarMascotas(): List<Mascota> =
-        json.decodeFromString(ListSerializer(Mascota.serializer()), archivoMascotas.readText())
-
-    @Synchronized
-    fun agregarMascota(m: Mascota) {
-        val lista = listarMascotas()
-        val nuevoId = (lista.maxOfOrNull { it.id } ?: 0) + 1
-        guardarMascotas(lista + m.copy(id = nuevoId))
-    }
-
-    // ---------- Solicitudes ----------
-
-    @Synchronized
-    fun listarSolicitudes(): List<Solicitud> =
-        json.decodeFromString(ListSerializer(Solicitud.serializer()), archivoSolicitudes.readText())
-
-    @Synchronized
-    fun crearSolicitud(mascotaId: Int, cliente: String) {
-        val mascota = listarMascotas().find { it.id == mascotaId } ?: return
-        val lista = listarSolicitudes()
-        val nuevoId = (lista.maxOfOrNull { it.id } ?: 0) + 1
-        val nueva = Solicitud(
-            id = nuevoId,
-            mascotaId = mascotaId,
-            mascota = mascota.nombre,
-            cliente = cliente,
-            estado = "PENDIENTE"
-        )
-        guardarSolicitudes(lista + nueva)
-    }
-
-    @Synchronized
-    fun cambiarEstado(id: Int, estado: String) {
-        val lista = listarSolicitudes().map { s ->
-            if (s.id == id) s.copy(estado = estado) else s
+        Database.conexion().use { c ->
+            c.createStatement().use { st ->
+                st.executeQuery("SELECT id, nombre, tipo, edad, refugio FROM mascotas ORDER BY id").use { rs ->
+                    val lista = mutableListOf<Mascota>()
+                    while (rs.next()) {
+                        lista.add(
+                            Mascota(
+                                id = rs.getInt("id"),
+                                nombre = rs.getString("nombre"),
+                                tipo = rs.getString("tipo"),
+                                edad = rs.getString("edad"),
+                                refugio = rs.getString("refugio")
+                            )
+                        )
+                    }
+                    lista
+                }
+            }
         }
-        guardarSolicitudes(lista)
+
+    fun agregarMascota(m: Mascota) {
+        Database.conexion().use { c ->
+            c.prepareStatement("INSERT INTO mascotas (nombre, tipo, edad, refugio) VALUES (?, ?, ?, ?)").use { ps ->
+                ps.setString(1, m.nombre)
+                ps.setString(2, m.tipo)
+                ps.setString(3, m.edad)
+                ps.setString(4, m.refugio)
+                ps.executeUpdate()
+            }
+        }
     }
 
-    // ---------- Escritura de archivos ----------
+    fun listarSolicitudes(): List<Solicitud> =
+        Database.conexion().use { c ->
+            c.createStatement().use { st ->
+                st.executeQuery(
+                    "SELECT s.id, s.mascota_id, m.nombre AS mascota, s.cliente, s.estado " +
+                            "FROM solicitudes s JOIN mascotas m ON m.id = s.mascota_id ORDER BY s.id"
+                ).use { rs ->
+                    val lista = mutableListOf<Solicitud>()
+                    while (rs.next()) {
+                        lista.add(
+                            Solicitud(
+                                id = rs.getInt("id"),
+                                mascotaId = rs.getInt("mascota_id"),
+                                mascota = rs.getString("mascota"),
+                                cliente = rs.getString("cliente"),
+                                estado = rs.getString("estado")
+                            )
+                        )
+                    }
+                    lista
+                }
+            }
+        }
 
-    private fun guardarMascotas(lista: List<Mascota>) {
-        archivoMascotas.writeText(json.encodeToString(ListSerializer(Mascota.serializer()), lista))
+    fun crearSolicitud(mascotaId: Int, cliente: String) {
+        Database.conexion().use { c ->
+            c.prepareStatement("INSERT INTO solicitudes (mascota_id, cliente) VALUES (?, ?)").use { ps ->
+                ps.setInt(1, mascotaId)
+                ps.setString(2, cliente)
+                ps.executeUpdate()
+            }
+        }
     }
 
-    private fun guardarSolicitudes(lista: List<Solicitud>) {
-        archivoSolicitudes.writeText(json.encodeToString(ListSerializer(Solicitud.serializer()), lista))
+    fun cambiarEstado(id: Int, estado: String) {
+        Database.conexion().use { c ->
+            c.prepareStatement("UPDATE solicitudes SET estado = ? WHERE id = ?").use { ps ->
+                ps.setString(1, estado)
+                ps.setInt(2, id)
+                ps.executeUpdate()
+            }
+        }
     }
-
-    private fun mascotasIniciales() = listOf(
-        Mascota(id = 1, nombre = "Firulais", tipo = "Perro", edad = "2 años", refugio = "Refugio Patitas Felices"),
-        Mascota(id = 2, nombre = "Luna", tipo = "Gata", edad = "1 año", refugio = "Refugio Patitas Felices"),
-        Mascota(id = 3, nombre = "Max", tipo = "Perro", edad = "4 años", refugio = "Refugio Patitas Felices"),
-        Mascota(id = 4, nombre = "Nala", tipo = "Perra", edad = "6 meses", refugio = "Refugio Patitas Felices")
-    )
 }
