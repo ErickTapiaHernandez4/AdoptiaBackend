@@ -5,5 +5,12 @@
         "mascota": "Firulais",
         "cliente": "Juan Cliente",
         "estado": "APROBADA"
+    },
+    {
+        "id": 2,
+        "mascotaId": 2,
+        "mascota": "Luna",
+        "cliente": "Juan Cliente",
+        "estado": "APROBADA"
     }
 ]
